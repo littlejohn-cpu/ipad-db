@@ -240,8 +240,13 @@ function selectRow(tr, row) {
   document.getElementById("mail").textContent = row.email;
   document.getElementById("title1").textContent = row.title1;
   document.getElementById("title2").textContent = row.title2;
-  document.getElementById("image").src = row.image;
+
+  const img = document.getElementById("image");
+  img.onerror = () => img.src = "";
+  img.referrerPolicy = "no-referrer";
+  img.src = row.image;
 }
+
 
 /* ===== コピー ===== */
 function copyMail() {
