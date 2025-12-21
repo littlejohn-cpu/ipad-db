@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>CSV DB App</title>
+
+<!-- CSVパーサ -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+/* ===== 共通 ===== */
+body {
+  margin: 0;
+  background: #333;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+button {
+  height: 56px;
+  font-size: 20px;
+  border-radius: 12px;
+  border: none;
+  margin-bottom: 12px;
+}
+
+.value {
+  font-size: 20px;
+  line-height: 1.4;
+  padding: 8px 0;
+  word-break: break-all;
+}
+
+img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* ===== 一覧 ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  font-size: 16px;
+  padding: 12px;
+  background: #666;
+}
+
+td {
+  font-size: 18px;
+  padding: 16px 12px;
+  border-bottom: 1px solid #999;
+  white-space: nowrap;
+}
+
+tr {
+  height: 58px;
+  cursor: pointer;
+}
+
+tr.selected {
+  background: #4a90e2;
+  outline: 2px solid #ffffff55;
+}
+
+/* ===== レイアウト：縦 ===== */
+.app {
+  display: grid;
+  grid-template-rows: 65% 35%;
+  height: 100vh;
+  padding: 16px;
+  gap: 16px;
+}
+
+.top {
+  background: #777;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.bottom {
+  background: #777;
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 8px;
+}
+
+/* ===== 横向き ===== */
+@media (orientation: landscape) {
+  .app {
+    grid-template-rows: 1fr;
+    grid-template-columns: 45% 55%;
+  }
+
+  .bottom {
+    display: grid;
+    grid-template-rows: 60% 40%;
+    gap: 16px;
+  }
+
+  .detail {
+    background: #777;
+    padding: 12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+  <!-- 一覧 -->
+  <div class="top">
+    <table>
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>分類</th>
+          <th>メーカー</th>
+          <th>タイトル1</th>
+          <th>タイトル2</th>
+          <th>タイトル3</th>
+        </tr>
+      </thead>
+      <tbody id="list"></tbody>
+    </table>
+  </div>
+
+  <!-- 詳細 -->
+  <div class="bottom">
+    <div class="detail">
+      <button onclick="copyMail()">メールアドレスをコピー</button>
+      <div id="email" class="value">---</div>
+      <div id="title1" class="value"></div>
+      <div id="title2" class="value"></div>
+    </div>
+    <div class="detail">
+      <img id="image">
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedEmail = "";
+
+/* CSV読み込み */
+Papa.parse("data.csv", {
