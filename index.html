@@ -2,109 +2,124 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>CSV DB App</title>
-
-<!-- CSVパーサ -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPad Database</title>
 
 <style>
-/* ===== 共通 ===== */
+/* ===== 基本 ===== */
 body {
   margin: 0;
-  background: #333;
-  color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-button {
-  height: 56px;
-  font-size: 20px;
-  border-radius: 12px;
-  border: none;
-  margin-bottom: 12px;
-}
-
-.value {
-  font-size: 20px;
+  font-size: 13px;
   line-height: 1.4;
-  padding: 8px 0;
-  word-break: break-all;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
 }
 
-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.container {
+  height: 100vh;
 }
 
 /* ===== 一覧 ===== */
+.list-area {
+  overflow-y: auto;
+  height: 100%;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th {
-  font-size: 16px;
-  padding: 12px;
-  background: #666;
-}
-
-td {
-  font-size: 18px;
-  padding: 16px 12px;
-  border-bottom: 1px solid #999;
+th, td {
+  border: 1px solid #444;
+  padding: 4px 6px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-tr {
-  height: 58px;
+thead th {
+  position: sticky;
+  top: 0;
+  background: #222;
+  z-index: 2;
   cursor: pointer;
+  user-select: none;
 }
 
 tr.selected {
-  background: #4a90e2;
-  outline: 2px solid #ffffff55;
+  background: #2a5bd7;
 }
 
-/* ===== レイアウト：縦 ===== */
-.app {
-  display: grid;
-  grid-template-rows: 65% 35%;
-  height: 100vh;
-  padding: 16px;
-  gap: 16px;
+/* ソート表示 */
+th.asc::after { content: " ▲"; font-size: 10px; }
+th.desc::after { content: " ▼"; font-size: 10px; }
+
+/* カラム幅 */
+.col-no { width: 48px; }
+.col-category { width: 80px; }
+.col-maker { width: 120px; }
+.col-title1 { width: 160px; }
+.col-title2 { width: 160px; }
+
+/* ===== 詳細 ===== */
+.detail {
+  padding: 8px;
+  box-sizing: border-box;
 }
 
-.top {
-  background: #777;
-  padding: 12px;
-  overflow-y: auto;
+.detail-mail {
+  font-size: 14px;
+  font-weight: bold;
+  word-break: break-all;
 }
 
-.bottom {
-  background: #777;
-  padding: 12px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 8px;
+.copy-btn {
+  margin: 6px 0;
+  padding: 6px;
+  background: #2a5bd7;
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+}
+
+.detail-image img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* ===== 横向き ===== */
 @media (orientation: landscape) {
-  .app {
-    grid-template-rows: 1fr;
-    grid-template-columns: 45% 55%;
-  }
-
-  .bottom {
+  .container {
     display: grid;
-    grid-template-rows: 60% 40%;
-    gap: 16px;
+    grid-template-columns: 6fr 4fr;
+  }
+}
+
+/* ===== 縦向き ===== */
+@media (orientation: portrait) {
+  .container {
+    display: grid;
+    grid-template-rows: 1fr auto;
   }
 
   .detail {
-    background: #777;
-    padding: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 8px;
+  }
+
+  .detail-mail,
+  .detail-titles {
+    grid-column: 1 / 2;
+  }
+
+  .detail-image {
+    grid-column: 2 / 3;
+    grid-row: 1 / 3;
   }
 }
 </style>
@@ -112,90 +127,121 @@ tr.selected {
 
 <body>
 
-<div class="app">
+<div class="container">
   <!-- 一覧 -->
-  <div class="top">
+  <div class="list-area">
     <table>
       <thead>
         <tr>
-          <th>No</th>
-          <th>分類</th>
-          <th>メーカー</th>
-          <th>タイトル1</th>
-          <th>タイトル2</th>
-          <th>タイトル3</th>
+          <th class="col-no" data-key="no">No</th>
+          <th class="col-category" data-key="category">分類</th>
+          <th class="col-maker" data-key="maker">メーカー</th>
+          <th class="col-title1" data-key="title1">タイトル1</th>
+          <th class="col-title2" data-key="title2">タイトル2</th>
         </tr>
       </thead>
-      <tbody id="list"></tbody>
+      <tbody id="tableBody"></tbody>
     </table>
   </div>
 
   <!-- 詳細 -->
-  <div class="bottom">
-    <div class="detail">
-      <button onclick="copyMail()">メールアドレスをコピー</button>
-      <div id="email" class="value">---</div>
-      <div id="title1" class="value"></div>
-      <div id="title2" class="value"></div>
+  <div class="detail">
+    <div class="detail-mail" id="mail"></div>
+    <button class="copy-btn" onclick="copyMail()">メールコピー</button>
+
+    <div class="detail-titles">
+      <div id="title1"></div>
+      <div id="title2"></div>
     </div>
-    <div class="detail">
-      <img id="image">
+
+    <div class="detail-image">
+      <img id="image" src="">
     </div>
   </div>
 </div>
 
 <script>
-let selectedEmail = "";
+let data = [];
+let originalData = [];
+let currentSortKey = null;
+let sortDir = 1;
 
-/* CSV読み込み */
-Papa.parse("data.csv", {
-  download: true,
-  header: true,
-  skipEmptyLines: true,
-  complete: function(results) {
-    createList(results.data);
-  }
-});
+fetch("data.csv")
+  .then(r => r.text())
+  .then(text => {
+    const lines = text.trim().split("\n");
+    const keys = lines.shift().split(",");
 
-/* 一覧生成 */
-function createList(data) {
-  const tbody = document.getElementById("list");
+    data = lines.map(line => {
+      const values = line.split(",");
+      let obj = {};
+      keys.forEach((k, i) => obj[k] = values[i]);
+      return obj;
+    });
 
-  data.forEach(item => {
+    originalData = [...data];
+    renderTable();
+  });
+
+function renderTable() {
+  const body = document.getElementById("tableBody");
+  body.innerHTML = "";
+
+  data.forEach((row, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${item.no}</td>
-      <td>${item.category}</td>
-      <td>${item.maker}</td>
-      <td>${item.title1}</td>
-      <td>${item.title2}</td>
-      <td>${item.title3}</td>
+      <td>${row.no}</td>
+      <td>${row.category}</td>
+      <td>${row.maker}</td>
+      <td>${row.title1}</td>
+      <td>${row.title2}</td>
     `;
 
-    tr.onclick = () => selectRow(tr, item);
-    tbody.appendChild(tr);
+    tr.onclick = () => selectRow(tr, row);
+    body.appendChild(tr);
   });
 }
 
-/* 行選択 */
-function selectRow(tr, item) {
-  document.querySelectorAll("tr.selected")
-    .forEach(r => r.classList.remove("selected"));
-
+function selectRow(tr, row) {
+  document.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
   tr.classList.add("selected");
 
-  selectedEmail = item.email;
-  document.getElementById("email").innerText = item.email;
-  document.getElementById("title1").innerText = item.title1;
-  document.getElementById("title2").innerText = item.title2;
-  document.getElementById("image").src = item.image_url;
+  document.getElementById("mail").textContent = row.email;
+  document.getElementById("title1").textContent = row.title1;
+  document.getElementById("title2").textContent = row.title2;
+  document.getElementById("image").src = row.image;
 }
 
-/* コピー */
 function copyMail() {
-  if (!selectedEmail) return;
-  navigator.clipboard.writeText(selectedEmail);
+  navigator.clipboard.writeText(
+    document.getElementById("mail").textContent
+  );
 }
+
+/* ソート */
+document.querySelectorAll("th[data-key]").forEach(th => {
+  th.onclick = () => {
+    const key = th.dataset.key;
+
+    if (currentSortKey === key) {
+      sortDir *= -1;
+    } else {
+      currentSortKey = key;
+      sortDir = 1;
+    }
+
+    data.sort((a, b) => {
+      if (a[key] < b[key]) return -1 * sortDir;
+      if (a[key] > b[key]) return 1 * sortDir;
+      return 0;
+    });
+
+    document.querySelectorAll("th").forEach(t => t.classList.remove("asc", "desc"));
+    th.classList.add(sortDir === 1 ? "asc" : "desc");
+
+    renderTable();
+  };
+});
 </script>
 
 </body>
