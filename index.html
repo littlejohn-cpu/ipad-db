@@ -149,3 +149,54 @@ let selectedEmail = "";
 
 /* CSV読み込み */
 Papa.parse("data.csv", {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(results) {
+    createList(results.data);
+  }
+});
+
+/* 一覧生成 */
+function createList(data) {
+  const tbody = document.getElementById("list");
+
+  data.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${item.no}</td>
+      <td>${item.category}</td>
+      <td>${item.maker}</td>
+      <td>${item.title1}</td>
+      <td>${item.title2}</td>
+      <td>${item.title3}</td>
+    `;
+
+    tr.onclick = () => selectRow(tr, item);
+    tbody.appendChild(tr);
+  });
+}
+
+/* 行選択 */
+function selectRow(tr, item) {
+  document.querySelectorAll("tr.selected")
+    .forEach(r => r.classList.remove("selected"));
+
+  tr.classList.add("selected");
+
+  selectedEmail = item.email;
+  document.getElementById("email").innerText = item.email;
+  document.getElementById("title1").innerText = item.title1;
+  document.getElementById("title2").innerText = item.title2;
+  document.getElementById("image").src = item.image_url;
+}
+
+/* コピー */
+function copyMail() {
+  if (!selectedEmail) return;
+  navigator.clipboard.writeText(selectedEmail);
+}
+</script>
+
+</body>
+</html>
