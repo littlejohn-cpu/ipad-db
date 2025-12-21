@@ -23,13 +23,17 @@ body {
 
 /* ===== 一覧 ===== */
 .list-area {
-  overflow-y: auto;
   height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
 }
 
 table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 th, td {
@@ -49,6 +53,7 @@ thead th {
   user-select: none;
 }
 
+/* 行選択 */
 tr.selected {
   background: #2a5bd7;
 }
@@ -59,8 +64,8 @@ th.desc::after { content: " ▼"; font-size: 10px; }
 
 /* カラム幅 */
 .col-no { width: 48px; }
-.col-category { width: 80px; }
-.col-maker { width: 120px; }
+.col-category { width: 80px; font-weight: 600; }
+.col-maker { width: 120px; font-weight: 600; }
 .col-title1 { width: 160px; }
 .col-title2 { width: 160px; }
 
@@ -88,9 +93,10 @@ th.desc::after { content: " ▼"; font-size: 10px; }
 .detail-image img {
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
-/* ===== 横向き ===== */
+/* ===== 横向き：6:4 ===== */
 @media (orientation: landscape) {
   .container {
     display: grid;
@@ -98,11 +104,11 @@ th.desc::after { content: " ▼"; font-size: 10px; }
   }
 }
 
-/* ===== 縦向き ===== */
+/* ===== 縦向き：上7 下3 ===== */
 @media (orientation: portrait) {
   .container {
     display: grid;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 7fr 3fr;
   }
 
   .detail {
@@ -146,8 +152,10 @@ th.desc::after { content: " ▼"; font-size: 10px; }
 
   <!-- 詳細 -->
   <div class="detail">
-    <div class="detail-mail" id="mail"></div>
-    <button class="copy-btn" onclick="copyMail()">メールコピー</button>
+    <div>
+      <div class="detail-mail" id="mail"></div>
+      <button class="copy-btn" onclick="copyMail()">メールコピー</button>
+    </div>
 
     <div class="detail-titles">
       <div id="title1"></div>
@@ -166,44 +174,67 @@ let originalData = [];
 let currentSortKey = null;
 let sortDir = 1;
 
+/* ===== CSV読み込み（安全パーサ） ===== */
 fetch("data.csv")
   .then(r => r.text())
   .then(text => {
-    const lines = text.trim().split("\n");
-    const keys = lines.shift().split(",");
-
-    data = lines.map(line => {
-      const values = line.split(",");
-      let obj = {};
-      keys.forEach((k, i) => obj[k] = values[i]);
-      return obj;
-    });
-
+    data = parseCSV(text);
     originalData = [...data];
     renderTable();
   });
 
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  const headers = lines.shift().split(",");
+
+  return lines.map(line => {
+    const values = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        inQuotes = !inQuotes;
+      } else if (c === "," && !inQuotes) {
+        values.push(current);
+        current = "";
+      } else {
+        current += c;
+      }
+    }
+    values.push(current);
+
+    const obj = {};
+    headers.forEach((h, i) => {
+      obj[h] = (values[i] || "").replace(/^"|"$/g, "").trim();
+    });
+    return obj;
+  });
+}
+
+/* ===== 描画 ===== */
 function renderTable() {
   const body = document.getElementById("tableBody");
   body.innerHTML = "";
 
-  data.forEach((row, i) => {
+  data.forEach(row => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.no}</td>
-      <td>${row.category}</td>
-      <td>${row.maker}</td>
-      <td>${row.title1}</td>
-      <td>${row.title2}</td>
+      <td class="col-no">${row.no}</td>
+      <td class="col-category">${row.category}</td>
+      <td class="col-maker">${row.maker}</td>
+      <td class="col-title1">${row.title1}</td>
+      <td class="col-title2">${row.title2}</td>
     `;
-
     tr.onclick = () => selectRow(tr, row);
     body.appendChild(tr);
   });
 }
 
+/* ===== 行選択 ===== */
 function selectRow(tr, row) {
-  document.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
+  document.querySelectorAll("#tableBody tr").forEach(r => r.classList.remove("selected"));
   tr.classList.add("selected");
 
   document.getElementById("mail").textContent = row.email;
@@ -212,13 +243,14 @@ function selectRow(tr, row) {
   document.getElementById("image").src = row.image;
 }
 
+/* ===== コピー ===== */
 function copyMail() {
   navigator.clipboard.writeText(
     document.getElementById("mail").textContent
   );
 }
 
-/* ソート */
+/* ===== ソート ===== */
 document.querySelectorAll("th[data-key]").forEach(th => {
   th.onclick = () => {
     const key = th.dataset.key;
@@ -241,6 +273,33 @@ document.querySelectorAll("th[data-key]").forEach(th => {
 
     renderTable();
   };
+});
+
+/* ===== 斜めスクロール防止（方向ロック） ===== */
+const listArea = document.querySelector(".list-area");
+let startX = 0, startY = 0;
+
+listArea.addEventListener("touchstart", e => {
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+}, { passive: true });
+
+listArea.addEventListener("touchmove", e => {
+  const dx = Math.abs(e.touches[0].clientX - startX);
+  const dy = Math.abs(e.touches[0].clientY - startY);
+
+  if (dx > dy) {
+    listArea.style.overflowY = "hidden";
+    listArea.style.overflowX = "auto";
+  } else {
+    listArea.style.overflowX = "hidden";
+    listArea.style.overflowY = "auto";
+  }
+}, { passive: true });
+
+listArea.addEventListener("touchend", () => {
+  listArea.style.overflowX = "auto";
+  listArea.style.overflowY = "auto";
 });
 </script>
 
